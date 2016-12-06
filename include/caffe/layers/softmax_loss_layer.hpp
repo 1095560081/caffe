@@ -123,6 +123,10 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
   LossParameter_NormalizationMode normalization_;
 
   int softmax_axis_, outer_num_, inner_num_;
+  /// label weight to be applied to the loss
+  void FillLabelWeights(const vector<Blob<Dtype>*>& bottom);
+  Blob<Dtype> label_weights_; //used by GPU
+  vector<Dtype> label_weights_vec_; //used by CPU
 };
 
 }  // namespace caffe
