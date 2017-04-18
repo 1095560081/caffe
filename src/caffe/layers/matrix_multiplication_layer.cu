@@ -13,8 +13,11 @@ void MatrixMultiplicationLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& b
   const Dtype* X_data = bottom[0]->gpu_data();
   const Dtype* Y_data = bottom[1]->gpu_data();
   Dtype* Z_data = top[0]->mutable_gpu_data();
-  
-  const int B = bottom[0]->shape(0);
+
+  const bool X_hasbatch = (bottom[0]->num_axes()==3);
+  const bool Y_hasbatch = (bottom[1]->num_axes()==3);
+  const bool Z_hasbatch = (top[0]->num_axes()==3);
+  const int B = Z_hasbatch ? top[0]->shape(0) : 1;
   const int X_stride = M_ * K_;
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;
@@ -22,9 +25,9 @@ void MatrixMultiplicationLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& b
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
       M_, N_, K_,
       (Dtype)1.,
-      X_data+b*X_stride, Y_data+b*Y_stride,
+      X_data+b*X_stride*int(X_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
       (Dtype)0.,
-      Z_data+b*Z_stride);
+      Z_data+b*Z_stride*int(Z_hasbatch));
   }
 }
 
@@ -39,7 +42,18 @@ void MatrixMultiplicationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& 
   const Dtype* X_data = bottom[0]->gpu_data();
   Dtype* Y_diff = bottom[1]->mutable_gpu_diff();
 
-  const int B = bottom[0]->shape(0);
+  const bool X_hasbatch = (bottom[0]->num_axes()==3);
+  const bool Y_hasbatch = (bottom[1]->num_axes()==3);
+  const bool Z_hasbatch = (top[0]->num_axes()==3);
+  const bool X_needbroadcast = (bottom[0]->num_axes() < bottom[1]->num_axes());
+  const bool Y_needbroadcast = (bottom[1]->num_axes() < bottom[0]->num_axes());
+  if (X_needbroadcast) {
+    caffe_gpu_set<Dtype>(bottom[0]->count(), (Dtype)0., X_diff);
+  }
+  if (Y_needbroadcast) {
+    caffe_gpu_set<Dtype>(bottom[1]->count(), (Dtype)0., Y_diff);
+  }
+  const int B = Z_hasbatch ? top[0]->shape(0) : 1;
   const int X_stride = M_ * K_;
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;
@@ -49,18 +63,18 @@ void MatrixMultiplicationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& 
       caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans,
         M_, K_, N_,
         (Dtype)1.,
-        Z_diff+b*Z_stride, Y_data+b*Y_stride,
-        (Dtype)0.,
-        X_diff+b*X_stride);
+        Z_diff+b*Z_stride*int(Z_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
+        (Dtype)(X_needbroadcast? 1. : 0.),
+        X_diff+b*X_stride*int(X_hasbatch));
     }
     if (propagate_down[1]) {
       // dl/dY' = X' * dl/d(XY)', i.e., bottom[1].diff = bottom[0].data' * top[0].diff
       caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
         K_, N_, M_,
         (Dtype)1.,
-        X_data+b*X_stride, Z_diff+b*Z_stride,
-        (Dtype)0.,
-        Y_diff+b*Y_stride);
+        X_data+b*X_stride*int(X_hasbatch), Z_diff+b*Z_stride*int(Z_hasbatch),
+        (Dtype)(Y_needbroadcast? 1. : 0.),
+        Y_diff+b*Y_stride*int(Y_hasbatch));
     }
   }//for b
 }

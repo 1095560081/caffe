@@ -10,8 +10,16 @@
 namespace caffe {
 
 /**
- * @brief compute matrix multiplication of two input X and Y and output Z=XY
+ * @brief compute matrix multiplication of two input X and Y and output $Z=XY$
  *
+ * Input:
+ * X: <BxMxK> or <MxK>
+ * Y: <BxKxN> or <KxN>
+ * Output:
+ * Z: <BxMxN> or <MxN>
+ *
+ * If X shape is <BxMxK> while Y shape is <KxN>, then $Z=\{X_0*Y, X_1*Y, ..., X_{B-1}*Y\}$ by broadcasting Y.
+ * And similar for the other case by broadcasting X.
  * TODO(dox): thorough documentation for Forward, Backward, and proto params.
  */
 template <typename Dtype>
