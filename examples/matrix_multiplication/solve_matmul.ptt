@@ -1,0 +1,15 @@
+train_net: "train_line_fitting_matmul.ptt"
+lr_policy: "poly"
+base_lr: 1.0e-1
+power: 1
+gamma: 0.1
+iter_size: 10
+stepsize: 2000
+average_loss: 20
+display: 1
+max_iter: 5000
+momentum: 0.9
+weight_decay: 0
+snapshot: 5000
+snapshot_prefix: "train_line_fitting_matmul"
+solver_mode: GPU

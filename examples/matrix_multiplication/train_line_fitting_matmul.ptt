@@ -1,0 +1,40 @@
+layer {
+  name: "data"
+  type: "Python"
+  top: "X"
+  top: "Y"
+  python_param {
+    module: "py_data_layer"
+    layer: "LineDataLayer"
+  }
+}
+layer {
+  name: "param_W"
+  type: "Parameter"
+  top: "W"
+  parameter_param { shape: { dim: 1 dim: 2 } }
+}
+layer {
+  name: "matmul_W_X"
+  type: "MatrixMultiplication"
+  bottom: "W"
+  bottom: "X"
+  top: "WX"  # 10x1x1
+}
+layer {
+  name: "add_WX_b"
+  type: "Bias"
+  bottom: "WX"
+  top: "WXpb"
+  bias_param {
+    num_axes: 0
+  }
+  param { decay_mult: 0 }
+}
+layer {
+  name: "loss_L2"
+  type: "EuclideanLoss"
+  bottom: "WXpb"
+  bottom: "Y"
+  top: "loss"
+}

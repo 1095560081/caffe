@@ -1,0 +1,36 @@
+layer {
+  name: "data"
+  type: "Python"
+  top: "X"
+  top: "Y"
+  python_param {
+    module: "py_data_layer"
+    layer: "LineDataLayer"
+  }
+}
+layer {
+  name: "ip_WXpb"
+  type: "InnerProduct"
+  param { decay_mult: 0 }
+  param { decay_mult: 0 }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  bottom: "X"
+  top: "WXpb"  # 10x1x1
+}
+layer {
+  name: "loss_L2"
+  type: "EuclideanLoss"
+  bottom: "WXpb"
+  bottom: "Y"
+  top: "loss"
+}
