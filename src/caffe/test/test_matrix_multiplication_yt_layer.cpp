@@ -5,7 +5,7 @@
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
 #include "caffe/filler.hpp"
-#include "caffe/layers/matrix_multiplication_layer.hpp"
+#include "caffe/layers/matrix_multiplication_yt_layer.hpp"
 
 #include "caffe/test/test_caffe_main.hpp"
 #include "caffe/test/test_gradient_check_util.hpp"
@@ -17,10 +17,10 @@ extern cudaDeviceProp CAFFE_TEST_CUDA_PROP;
 #endif
 
 template <typename TypeParam>
-class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
+class MatrixMultiplicationYtLayerTest : public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;
  protected:
-  MatrixMultiplicationLayerTest()
+  MatrixMultiplicationYtLayerTest()
       : blob_bottom_X_(new Blob<Dtype>()),
         blob_bottom_Y_(new Blob<Dtype>()),
         blob_bottom_x_(new Blob<Dtype>()),
@@ -30,12 +30,12 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
     vector<int> shape(3);
     shape[0]=2; shape[1]=3; shape[2]=4;
     blob_bottom_X_->Reshape(shape);
-    shape[0]=2; shape[1]=4; shape[2]=5;
+    shape[0]=2; shape[1]=5; shape[2]=4;
     blob_bottom_Y_->Reshape(shape);
     vector<int> shape2(2);
     shape2[0]=3; shape2[1]=4;
     blob_bottom_x_->Reshape(shape2);
-    shape2[0]=4; shape2[1]=5;
+    shape2[0]=5; shape2[1]=4;
     blob_bottom_y_->Reshape(shape2);
     // fill the values
     FillerParameter filler_param;
@@ -46,7 +46,7 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
     filler.Fill(this->blob_bottom_y_);
     blob_top_vec_.push_back(blob_top_);
   }
-  virtual ~MatrixMultiplicationLayerTest() {
+  virtual ~MatrixMultiplicationYtLayerTest() {
     delete blob_bottom_X_;
     delete blob_bottom_Y_;
     delete blob_bottom_x_;
@@ -62,13 +62,13 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
   vector<Blob<Dtype>*> blob_top_vec_;
 };
 
-TYPED_TEST_CASE(MatrixMultiplicationLayerTest, TestDtypesAndDevices);
+TYPED_TEST_CASE(MatrixMultiplicationYtLayerTest, TestDtypesAndDevices);
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestSetUp) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestSetUp) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
-  shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
-      new MatrixMultiplicationLayer<Dtype>(layer_param));
+  shared_ptr<MatrixMultiplicationYtLayer<Dtype> > layer(
+      new MatrixMultiplicationYtLayer<Dtype>(layer_param));
 
   //X Y
   this->blob_bottom_vec_.clear();
@@ -122,6 +122,7 @@ static void print_mat(
     }
     std::cout<<std::endl;
   }
+  std::cout.flush();
 }
 
 template <typename Dtype>
@@ -131,23 +132,22 @@ static void check_mat_mul(
 {
 #if 0
   print_mat<Dtype>(M,K,X,"X");
-  print_mat<Dtype>(K,N,Y,"Y");
+  print_mat<Dtype>(N,K,Y,"Y");
   print_mat<Dtype>(M,N,Z,"Z");
-  std::cout<<"-----------"<<std::endl;
 #endif
   for(int m=0; m<M; ++m) {
     for(int n=0; n<N; ++n) {
       const Dtype z=Z[m*N+n];
       Dtype expected_z=0;
       for(int k=0; k<K; ++k) {
-        expected_z += X[m*K+k]*Y[k*N+n];
+        expected_z += X[m*K+k]*Y[n*K+k];
       }
       EXPECT_FLOAT_EQ(expected_z, z);
     }
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXY) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestForwardXY) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_X_);
@@ -159,8 +159,8 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXY) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
-        new MatrixMultiplicationLayer<Dtype>(layer_param));
+    shared_ptr<MatrixMultiplicationYtLayer<Dtype> > layer(
+        new MatrixMultiplicationYtLayer<Dtype>(layer_param));
     layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     const Dtype* X_data = this->blob_bottom_X_->cpu_data();
@@ -184,7 +184,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXY) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXy) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestForwardXy) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_X_);
@@ -196,8 +196,8 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXy) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
-        new MatrixMultiplicationLayer<Dtype>(layer_param));
+    shared_ptr<MatrixMultiplicationYtLayer<Dtype> > layer(
+        new MatrixMultiplicationYtLayer<Dtype>(layer_param));
     layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     const Dtype* X_data = this->blob_bottom_X_->cpu_data();
@@ -220,7 +220,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXy) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxY) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestForwardxY) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_x_);
@@ -232,8 +232,8 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxY) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
-        new MatrixMultiplicationLayer<Dtype>(layer_param));
+    shared_ptr<MatrixMultiplicationYtLayer<Dtype> > layer(
+        new MatrixMultiplicationYtLayer<Dtype>(layer_param));
     layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     const Dtype* x_data = this->blob_bottom_x_->cpu_data();
@@ -256,7 +256,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxY) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxy) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestForwardxy) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_x_);
@@ -268,8 +268,8 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxy) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
-        new MatrixMultiplicationLayer<Dtype>(layer_param));
+    shared_ptr<MatrixMultiplicationYtLayer<Dtype> > layer(
+        new MatrixMultiplicationYtLayer<Dtype>(layer_param));
     layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
     const Dtype* x_data = this->blob_bottom_x_->cpu_data();
@@ -287,7 +287,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardxy) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXY) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestGradientXY) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_X_);
@@ -299,7 +299,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXY) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    MatrixMultiplicationLayer<Dtype> layer(layer_param);
+    MatrixMultiplicationYtLayer<Dtype> layer(layer_param);
     GradientChecker<Dtype> checker(1e-2, 1e-3);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
         this->blob_top_vec_);
@@ -308,7 +308,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXY) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXy) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestGradientXy) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_X_);
@@ -320,7 +320,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXy) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    MatrixMultiplicationLayer<Dtype> layer(layer_param);
+    MatrixMultiplicationYtLayer<Dtype> layer(layer_param);
     GradientChecker<Dtype> checker(1e-2, 1e-3);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
         this->blob_top_vec_);
@@ -329,7 +329,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXy) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientxY) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestGradientxY) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_x_);
@@ -341,7 +341,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientxY) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    MatrixMultiplicationLayer<Dtype> layer(layer_param);
+    MatrixMultiplicationYtLayer<Dtype> layer(layer_param);
     GradientChecker<Dtype> checker(1e-2, 1e-3);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
         this->blob_top_vec_);
@@ -350,7 +350,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientxY) {
   }
 }
 
-TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientxy) {
+TYPED_TEST(MatrixMultiplicationYtLayerTest, TestGradientxy) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_x_);
@@ -362,7 +362,7 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientxy) {
   if (Caffe::mode() == Caffe::CPU ||
       sizeof(Dtype) == 4 || IS_VALID_CUDA) {
     LayerParameter layer_param;
-    MatrixMultiplicationLayer<Dtype> layer(layer_param);
+    MatrixMultiplicationYtLayer<Dtype> layer(layer_param);
     GradientChecker<Dtype> checker(1e-2, 1e-3);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
         this->blob_top_vec_);
