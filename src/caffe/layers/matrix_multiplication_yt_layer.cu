@@ -14,10 +14,10 @@ void MatrixMultiplicationYtLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>&
   const Dtype* Y_data = bottom[1]->gpu_data();
   Dtype* Z_data = top[0]->mutable_gpu_data();
 
-  const bool X_hasbatch = (bottom[0]->num_axes()==3);
-  const bool Y_hasbatch = (bottom[1]->num_axes()==3);
-  const bool Z_hasbatch = (top[0]->num_axes()==3);
-  const int B = Z_hasbatch ? top[0]->shape(0) : 1;
+  const bool X_hasbatch = (bottom[0]->num_axes()>2);
+  const bool Y_hasbatch = (bottom[1]->num_axes()>2);
+  const bool Z_hasbatch = (top[0]->num_axes()>2);
+  const int B = Z_hasbatch ? top[0]->count(0, top[0]->CanonicalAxisIndex(-2)) : 1;
   const int X_stride = M_ * K_;
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;
@@ -42,9 +42,10 @@ void MatrixMultiplicationYtLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>
   const Dtype* X_data = bottom[0]->gpu_data();
   Dtype* Y_diff = bottom[1]->mutable_gpu_diff();
 
-  const bool X_hasbatch = (bottom[0]->num_axes()==3);
-  const bool Y_hasbatch = (bottom[1]->num_axes()==3);
-  const bool Z_hasbatch = (top[0]->num_axes()==3);
+  const bool X_hasbatch = (bottom[0]->num_axes()>2);
+  const bool Y_hasbatch = (bottom[1]->num_axes()>2);
+  const bool Z_hasbatch = (top[0]->num_axes()>2);
+  const int B = Z_hasbatch ? top[0]->count(0, top[0]->CanonicalAxisIndex(-2)) : 1;
   const bool X_needbroadcast = (bottom[0]->num_axes() < bottom[1]->num_axes());
   const bool Y_needbroadcast = (bottom[1]->num_axes() < bottom[0]->num_axes());
   if (X_needbroadcast) {
@@ -53,7 +54,6 @@ void MatrixMultiplicationYtLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>
   if (Y_needbroadcast) {
     caffe_gpu_set<Dtype>(bottom[1]->count(), (Dtype)0., Y_diff);
   }
-  const int B = Z_hasbatch ? top[0]->shape(0) : 1;
   const int X_stride = M_ * K_;
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;

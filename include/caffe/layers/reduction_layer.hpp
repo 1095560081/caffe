@@ -50,6 +50,8 @@ class ReductionLayer : public Layer<Dtype> {
   int num_;
   /// @brief the input size of each reduction
   int dim_;
+  /// @brief reduce for every $group
+  int group_;
   /// @brief a helper Blob used for summation (op_ == SUM)
   Blob<Dtype> sum_multiplier_;
 };

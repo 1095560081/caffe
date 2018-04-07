@@ -1,5 +1,12 @@
-#ifndef CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
-#define CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+/*
+ * l2_normalization_layer.hpp
+ *
+ *  Created on: Oct 20, 2017
+ *      Author: cfeng
+ */
+
+#ifndef INCLUDE_CAFFE_LAYERS_L2_NORMALIZATION_LAYER_HPP_
+#define INCLUDE_CAFFE_LAYERS_L2_NORMALIZATION_LAYER_HPP_
 
 #include <vector>
 
@@ -10,30 +17,26 @@
 namespace caffe {
 
 /**
- * @brief compute matrix multiplication of two input X and Y and output $Z=XY^T$
+ * @brief L2-normalize input, maybe independently along an specific axis
  *
  * Input:
- * X: <B1xB2...xBnxMxK> or <MxK>
- * Y: <B1xB2...xBnxNxK> or <NxK>
+ * X: <S1xS2...xSN>
  * Output:
- * Z: <B1xB2...xBnxMxN> or <MxN>
+ * Y: <S1xS2...xSN>
  *
- * If X shape is <BxMxK> while Y shape is <NxK>, then $Z=\{X_0*Y^T, X_1*Y^T, ..., X_{B-1}*Y^T\}$ by broadcasting Y.
- * And similar for the other case by broadcasting X.
- * TODO(dox): thorough documentation for Forward, Backward, and proto params.
  */
 template <typename Dtype>
-class MatrixMultiplicationYtLayer : public Layer<Dtype> {
+class L2NormalizationLayer : public Layer<Dtype> {
  public:
-  explicit MatrixMultiplicationYtLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
+  explicit L2NormalizationLayer(const LayerParameter& param)
+      : Layer<Dtype>(param), axis_(0), is_global_(true), eps_(1e-10), n_(0), m_(0), too_small_(false) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "MatrixMultiplicationYt"; }
-  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline const char* type() const { return "L2Normalization"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
  protected:
@@ -46,11 +49,13 @@ class MatrixMultiplicationYtLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int M_; //X <MxK>, Y<NxK>, Z<MxN>
-  int K_;
-  int N_;
+  int axis_;
+  bool is_global_;
+  Dtype eps_;
+  Dtype n_, m_; //catch for is_global_==true
+  bool too_small_;
 };
 
 }  // namespace caffe
 
-#endif  // CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+#endif /* INCLUDE_CAFFE_LAYERS_L2_NORMALIZATION_LAYER_HPP_ */

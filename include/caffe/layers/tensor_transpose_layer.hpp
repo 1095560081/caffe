@@ -1,5 +1,13 @@
-#ifndef CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
-#define CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+/*
+ * tensor_transpose_layer.hpp
+ *
+ *  Created on: Nov 10, 2017
+ *      Author: cfeng
+ */
+
+#ifndef INCLUDE_CAFFE_LAYERS_TENSOR_TRANSPOSE_LAYER_HPP_
+#define INCLUDE_CAFFE_LAYERS_TENSOR_TRANSPOSE_LAYER_HPP_
+
 
 #include <vector>
 
@@ -10,30 +18,25 @@
 namespace caffe {
 
 /**
- * @brief compute matrix multiplication of two input X and Y and output $Z=XY^T$
+ * @brief transpose input tensor X and output $Y=X(o)$ where o is the axes order
  *
  * Input:
- * X: <B1xB2...xBnxMxK> or <MxK>
- * Y: <B1xB2...xBnxNxK> or <NxK>
+ * X: <B1xB2...xBn>
  * Output:
- * Z: <B1xB2...xBnxMxN> or <MxN>
- *
- * If X shape is <BxMxK> while Y shape is <NxK>, then $Z=\{X_0*Y^T, X_1*Y^T, ..., X_{B-1}*Y^T\}$ by broadcasting Y.
- * And similar for the other case by broadcasting X.
- * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ * Y: <Bo(1)xBo(2)...xBo(n)>
  */
 template <typename Dtype>
-class MatrixMultiplicationYtLayer : public Layer<Dtype> {
+class TensorTransposeLayer : public Layer<Dtype> {
  public:
-  explicit MatrixMultiplicationYtLayer(const LayerParameter& param)
+  explicit TensorTransposeLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "MatrixMultiplicationYt"; }
-  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline const char* type() const { return "TensorTranspose"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
  protected:
@@ -46,11 +49,12 @@ class MatrixMultiplicationYtLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int M_; //X <MxK>, Y<NxK>, Z<MxN>
-  int K_;
-  int N_;
+  Blob<unsigned int> order_; //set from caffe.proto
+  Blob<unsigned int> Xstride_;
+  Blob<unsigned int> Ystride_;
 };
 
 }  // namespace caffe
 
-#endif  // CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+
+#endif /* INCLUDE_CAFFE_LAYERS_TENSOR_TRANSPOSE_LAYER_HPP_ */

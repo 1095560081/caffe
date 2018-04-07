@@ -19,6 +19,8 @@ class ReductionLayerTest : public MultiDeviceTest<TypeParam> {
  protected:
   ReductionLayerTest()
       : blob_bottom_(new Blob<Dtype>(2, 3, 4, 5)),
+        blob_X_(new Blob<Dtype>()),
+        blob_Y_(new Blob<Dtype>()),
         blob_top_(new Blob<Dtype>()) {
     // fill the values
     Caffe::set_random_seed(1701);
@@ -27,9 +29,35 @@ class ReductionLayerTest : public MultiDeviceTest<TypeParam> {
     filler.Fill(this->blob_bottom_);
     blob_bottom_vec_.push_back(blob_bottom_);
     blob_top_vec_.push_back(blob_top_);
+
+    vector<int> shape(2);
+    shape[0]=5; shape[1]=4;
+    blob_X_->Reshape(shape);
+    shape[0]=5; shape[1]=2;
+    blob_Y_->Reshape(shape);
+
+    Dtype X[5][4]={
+      {1,2,3,4},
+      {1,3,2,4},
+      {2,3,1,4},
+      {4,1,2,3},
+      {4,2,3,1}
+    };
+    Dtype Y[5][2]={
+      {2,12},
+      {3,8},
+      {6,4},
+      {4,6},
+      {8,3}
+    };
+    caffe_copy(blob_X_->count(), &X[0][0], blob_X_->mutable_cpu_data());
+    caffe_copy(blob_Y_->count(), &Y[0][0], blob_Y_->mutable_cpu_data());
+    blob_bottom2_vec_.push_back(blob_X_);
   }
   virtual ~ReductionLayerTest() {
     delete blob_bottom_;
+    delete blob_X_;
+    delete blob_Y_;
     delete blob_top_;
   }
 
@@ -92,8 +120,11 @@ class ReductionLayerTest : public MultiDeviceTest<TypeParam> {
   }
 
   Blob<Dtype>* const blob_bottom_;
+  Blob<Dtype>* const blob_X_;
+  Blob<Dtype>* const blob_Y_;
   Blob<Dtype>* const blob_top_;
   vector<Blob<Dtype>*> blob_bottom_vec_;
+  vector<Blob<Dtype>*> blob_bottom2_vec_;
   vector<Blob<Dtype>*> blob_top_vec_;
 };
 
@@ -148,6 +179,47 @@ TYPED_TEST(ReductionLayerTest, TestSumCoeffAxis1) {
   const int kAxis = 1;
   this->TestForward(kOp, kCoeff, kAxis);
 }
+
+TYPED_TEST(ReductionLayerTest, TestProd) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  ReductionParameter* reduction_param = layer_param.mutable_reduction_param();
+  reduction_param->set_operation(ReductionParameter_ReductionOp_PROD);
+  reduction_param->set_group(2);
+  shared_ptr<ReductionLayer<Dtype> > layer(
+      new ReductionLayer<Dtype>(layer_param));
+  layer->SetUp(this->blob_bottom2_vec_, this->blob_top_vec_);
+  layer->Forward(this->blob_bottom2_vec_, this->blob_top_vec_);
+  ASSERT_EQ(this->blob_top_->num_axes(), 2);
+  EXPECT_EQ(this->blob_top_->shape(0), 5);
+  EXPECT_EQ(this->blob_top_->shape(1), 2);
+  return;
+  const Dtype* Y = this->blob_Y_->cpu_data();
+  const Dtype* Y_calc = this->blob_top_->cpu_data();
+  const int N = this->blob_X_->shape(0);
+  const int K = this->blob_Y_->shape(1);
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < K; ++i) {
+      const Dtype result = Y_calc[i*K+j];
+      const Dtype expected = Y[i*K+j];
+      EXPECT_FLOAT_EQ(expected, result)
+        << "Incorrect result computed with PROD!";
+    }
+  }
+}
+
+TYPED_TEST(ReductionLayerTest, TestProdGradient) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  ReductionParameter* reduction_param = layer_param.mutable_reduction_param();
+  reduction_param->set_operation(ReductionParameter_ReductionOp_PROD);
+  reduction_param->set_group(2);
+  ReductionLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 2e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom2_vec_,
+      this->blob_top_vec_);
+}
+
 
 TYPED_TEST(ReductionLayerTest, TestSumGradient) {
   const ReductionParameter_ReductionOp kOp = ReductionParameter_ReductionOp_SUM;

@@ -53,6 +53,15 @@ template <>
 void caffe_axpy<double>(const int N, const double alpha, const double* X,
     double* Y) { cblas_daxpy(N, alpha, X, 1, Y, 1); }
 
+template <>
+void caffe_strided_axpy<float>(const int N, const float alpha, const float* X, const int inc_x,
+    float* Y, const int inc_y) { cblas_saxpy(N, alpha, X, inc_x, Y, inc_y); }
+
+template <>
+void caffe_strided_axpy<double>(const int N, const double alpha, const double* X, const int inc_x,
+    double* Y, const int inc_y) { cblas_daxpy(N, alpha, X, inc_x, Y, inc_y); }
+
+
 template <typename Dtype>
 void caffe_set(const int N, const Dtype alpha, Dtype* Y) {
   if (alpha == 0) {
@@ -69,16 +78,16 @@ template void caffe_set<float>(const int N, const float alpha, float* Y);
 template void caffe_set<double>(const int N, const double alpha, double* Y);
 
 template <>
-void caffe_add_scalar(const int N, const float alpha, float* Y) {
+void caffe_add_scalar(const int N, const float alpha, float* Y, const int stride) {
   for (int i = 0; i < N; ++i) {
-    Y[i] += alpha;
+    Y[i*stride] += alpha;
   }
 }
 
 template <>
-void caffe_add_scalar(const int N, const double alpha, double* Y) {
+void caffe_add_scalar(const int N, const double alpha, double* Y, const int stride) {
   for (int i = 0; i < N; ++i) {
-    Y[i] += alpha;
+    Y[i*stride] += alpha;
   }
 }
 
@@ -125,6 +134,19 @@ void caffe_cpu_axpby<double>(const int N, const double alpha, const double* X,
                              const double beta, double* Y) {
   cblas_daxpby(N, alpha, X, 1, beta, Y, 1);
 }
+
+template <>
+void caffe_cpu_strided_axpby<float>(const int N, const float alpha, const float* X, const int inc_x,
+                            const float beta, float* Y, const int inc_y) {
+  cblas_saxpby(N, alpha, X, inc_x, beta, Y, inc_y);
+}
+
+template <>
+void caffe_cpu_strided_axpby<double>(const int N, const double alpha, const double* X, const int inc_x,
+                             const double beta, double* Y, const int inc_y) {
+  cblas_daxpby(N, alpha, X, inc_x, beta, Y, inc_y);
+}
+
 
 template <>
 void caffe_add<float>(const int n, const float* a, const float* b,
@@ -381,5 +403,40 @@ void caffe_cpu_scale<double>(const int n, const double alpha, const double *x,
   cblas_dcopy(n, x, 1, y, 1);
   cblas_dscal(n, alpha, y, 1);
 }
+
+template <>
+void caffe_cpu_strided_scale<float>(const int n, const float alpha,
+                                    const float *x, const int inc_x,
+                                    float* y, const int inc_y)
+{
+  cblas_scopy(n, x, inc_x, y, inc_y);
+  cblas_sscal(n, alpha, y, inc_y);
+}
+
+template <>
+void caffe_cpu_strided_scale<double>(const int n, const double alpha,
+                                    const double *x, const int inc_x,
+                                    double* y, const int inc_y)
+{
+  cblas_dcopy(n, x, inc_x, y, inc_y);
+  cblas_dscal(n, alpha, y, inc_y);
+}
+
+template <>
+void caffe_cpu_strided_copy<float>(const int n,
+                                    const float *x, const int inc_x,
+                                    float* y, const int inc_y)
+{
+  cblas_scopy(n, x, inc_x, y, inc_y);
+}
+
+template <>
+void caffe_cpu_strided_copy<double>(const int n,
+                                    const double *x, const int inc_x,
+                                    double* y, const int inc_y)
+{
+  cblas_dcopy(n, x, inc_x, y, inc_y);
+}
+
 
 }  // namespace caffe

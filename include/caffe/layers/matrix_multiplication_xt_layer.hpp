@@ -1,5 +1,5 @@
-#ifndef CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
-#define CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+#ifndef CAFFE_MATRIX_MULTIPLICATION_XT_LAYER_HPP_
+#define CAFFE_MATRIX_MULTIPLICATION_XT_LAYER_HPP_
 
 #include <vector>
 
@@ -10,29 +10,29 @@
 namespace caffe {
 
 /**
- * @brief compute matrix multiplication of two input X and Y and output $Z=XY^T$
+ * @brief compute matrix multiplication of two input X and Y and output $Z=X^T Y$
  *
  * Input:
- * X: <B1xB2...xBnxMxK> or <MxK>
- * Y: <B1xB2...xBnxNxK> or <NxK>
+ * X: <B1xB2...xBnxKxM> or <KxM>
+ * Y: <B1xB2...xBnxKxN> or <KxN>
  * Output:
  * Z: <B1xB2...xBnxMxN> or <MxN>
  *
- * If X shape is <BxMxK> while Y shape is <NxK>, then $Z=\{X_0*Y^T, X_1*Y^T, ..., X_{B-1}*Y^T\}$ by broadcasting Y.
+ * If X shape is <BxKxM> while Y shape is <KxN>, then $Z=\{X_0^T*Y, X_1^T*Y, ..., X_{B-1}^T*Y\}$ by broadcasting Y.
  * And similar for the other case by broadcasting X.
  * TODO(dox): thorough documentation for Forward, Backward, and proto params.
  */
 template <typename Dtype>
-class MatrixMultiplicationYtLayer : public Layer<Dtype> {
+class MatrixMultiplicationXtLayer : public Layer<Dtype> {
  public:
-  explicit MatrixMultiplicationYtLayer(const LayerParameter& param)
+  explicit MatrixMultiplicationXtLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "MatrixMultiplicationYt"; }
+  virtual inline const char* type() const { return "MatrixMultiplicationXt"; }
   virtual inline int ExactNumBottomBlobs() const { return 2; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
@@ -46,11 +46,11 @@ class MatrixMultiplicationYtLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int M_; //X <MxK>, Y<NxK>, Z<MxN>
+  int M_; //X <KxM>, Y<KxN>, Z<MxN>
   int K_;
   int N_;
 };
 
 }  // namespace caffe
 
-#endif  // CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+#endif  // CAFFE_MATRIX_MULTIPLICATION_XT_LAYER_HPP_

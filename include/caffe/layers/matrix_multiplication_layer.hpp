@@ -13,10 +13,10 @@ namespace caffe {
  * @brief compute matrix multiplication of two input X and Y and output $Z=XY$
  *
  * Input:
- * X: <BxMxK> or <MxK>
- * Y: <BxKxN> or <KxN>
+ * X: <B1xB2...xBnxMxK> or <MxK>
+ * Y: <B1xB2...xBnxKxN> or <KxN>
  * Output:
- * Z: <BxMxN> or <MxN>
+ * Z: <B1xB2...xBnxMxN> or <MxN>
  *
  * If X shape is <BxMxK> while Y shape is <KxN>, then $Z=\{X_0*Y, X_1*Y, ..., X_{B-1}*Y\}$ by broadcasting Y.
  * And similar for the other case by broadcasting X.

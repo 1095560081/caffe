@@ -9,11 +9,27 @@ template <typename Dtype>
 void ReductionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   op_ = this->layer_param_.reduction_param().operation();
+  group_ = this->layer_param_.reduction_param().group();
+  CHECK(group_!=0) << "group should not be 0!";
 }
 
 template <typename Dtype>
 void ReductionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+  if (op_ == ReductionParameter_ReductionOp_PROD) {
+    if (group_>0)
+      CHECK_EQ(bottom[0]->shape(1)%group_, 0) << "input columns is not divisible by group!";
+
+    axis_ = 1; //TODO: read from proto
+
+    CHECK_EQ(bottom[0]->num_axes(), 2) << "input must be a (NxM) matrix!";
+    vector<int> top_shape(2);
+    top_shape[0]=bottom[0]->shape(0);
+    top_shape[1]= group_<0 ? 1 : bottom[0]->shape(1)/group_;
+    top[0]->Reshape(top_shape);
+    return;
+  }
+
   axis_ = bottom[0]->CanonicalAxisIndex(
       this->layer_param_.reduction_param().axis());
   // In the output, we'll keep all axes up to the reduction axis, but
@@ -47,6 +63,25 @@ void ReductionLayer<Dtype>::Forward_cpu(
     mult_data = sum_multiplier_.cpu_data();
   }
   Dtype* top_data = top[0]->mutable_cpu_data();
+
+  if (op_ == ReductionParameter_ReductionOp_PROD) {
+    const int N = bottom[0]->shape(0);
+    const int M = bottom[0]->shape(1);
+    const int K = top[0]->shape(1);
+    const int G = M/K;
+
+    for(int i=0; i<N; ++i) {
+      for(int j=0; j<K; ++j) {
+        top_data[i*K+j]=(Dtype)1.0;
+        for(int g=0; g<G; ++g) {
+          top_data[i*K+j] *= bottom_data[i*M+j*G+g];
+        }
+      }
+    }
+
+    return;
+  }
+
   for (int i = 0; i < num_; ++i) {
     switch (op_) {
     case ReductionParameter_ReductionOp_SUM:
@@ -87,6 +122,7 @@ void ReductionLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   // Operations that need bottom_data
   case ReductionParameter_ReductionOp_ASUM:
   case ReductionParameter_ReductionOp_SUMSQ:
+  case ReductionParameter_ReductionOp_PROD:
     bottom_data = bottom[0]->cpu_data();
     break;
   default:
@@ -95,6 +131,29 @@ void ReductionLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
   const Dtype* top_diff = top[0]->cpu_diff();
   Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
+
+  if (op_ == ReductionParameter_ReductionOp_PROD) {
+    const Dtype* top_data = top[0]->cpu_data();
+
+    const int N = bottom[0]->shape(0);
+    const int M = bottom[0]->shape(1);
+    const int K = top[0]->shape(1);
+    const int G = M/K;
+
+    for(int i=0; i<N; ++i) {
+      for(int j=0; j<M; ++j) {
+        const int src = i*M+j;
+        const int dst = i*K+j/G;
+        bottom_diff[src]=
+          top_data[dst]==0 ?
+            (Dtype)0.0 :
+            top_diff[dst]*top_data[dst]/bottom_data[src];
+      }
+    }
+
+    return;
+  }
+
   for (int i = 0; i < num_; ++i) {
     const Dtype bottom_coeff = (*top_diff) * coeff_;
     switch (op_) {

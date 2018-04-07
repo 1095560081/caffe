@@ -34,6 +34,15 @@ void caffe_cpu_axpby(const int N, const Dtype alpha, const Dtype* X,
     const Dtype beta, Dtype* Y);
 
 template <typename Dtype>
+void caffe_strided_axpy(const int N, const Dtype alpha, const Dtype* X, const int inc_x,
+    Dtype* Y, const int inc_y);
+
+template <typename Dtype>
+void caffe_cpu_strided_axpby(const int N, const Dtype alpha, const Dtype* X, const int inc_x,
+    const Dtype beta, Dtype* Y, const int inc_y);
+
+
+template <typename Dtype>
 void caffe_copy(const int N, const Dtype *X, Dtype *Y);
 
 template <typename Dtype>
@@ -44,7 +53,7 @@ inline void caffe_memset(const size_t N, const int alpha, void* X) {
 }
 
 template <typename Dtype>
-void caffe_add_scalar(const int N, const Dtype alpha, Dtype *X);
+void caffe_add_scalar(const int N, const Dtype alpha, Dtype *X, const int stride=1);
 
 template <typename Dtype>
 void caffe_scal(const int N, const Dtype alpha, Dtype *X);
@@ -145,6 +154,13 @@ DEFINE_CAFFE_CPU_UNARY_FUNC(fabs, y[i] = std::fabs(x[i]))
 template <typename Dtype>
 void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
 
+template <typename Dtype>
+void caffe_cpu_strided_scale(const int n, const Dtype alpha, const Dtype *x, const int inc_x, Dtype* y, const int inc_y);
+
+template <typename Dtype>
+void caffe_cpu_strided_copy(const int n, const Dtype *x, const int inc_x, Dtype* y, const int inc_y);
+
+
 #ifndef CPU_ONLY  // GPU
 
 // Decaf gpu gemm provides an interface that is almost the same as the cpu
@@ -183,7 +199,7 @@ inline void caffe_gpu_memset(const size_t N, const int alpha, void* X) {
 }
 
 template <typename Dtype>
-void caffe_gpu_add_scalar(const int N, const Dtype alpha, Dtype *X);
+void caffe_gpu_add_scalar(const int N, const Dtype alpha, Dtype *X, const int stride=1);
 
 template <typename Dtype>
 void caffe_gpu_scal(const int N, const Dtype alpha, Dtype *X);

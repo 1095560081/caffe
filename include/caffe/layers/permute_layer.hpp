@@ -1,5 +1,5 @@
-#ifndef CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
-#define CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+#ifndef CAFFE_PERMUTE_LAYER_HPP_
+#define CAFFE_PERMUTE_LAYER_HPP_
 
 #include <vector>
 
@@ -10,30 +10,29 @@
 namespace caffe {
 
 /**
- * @brief compute matrix multiplication of two input X and Y and output $Z=XY^T$
+ * @brief Permute the input blob by changing the memory order of the data.
  *
- * Input:
- * X: <B1xB2...xBnxMxK> or <MxK>
- * Y: <B1xB2...xBnxNxK> or <NxK>
- * Output:
- * Z: <B1xB2...xBnxMxN> or <MxN>
- *
- * If X shape is <BxMxK> while Y shape is <NxK>, then $Z=\{X_0*Y^T, X_1*Y^T, ..., X_{B-1}*Y^T\}$ by broadcasting Y.
- * And similar for the other case by broadcasting X.
- * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ * TODO(weiliu89): thorough documentation for Forward, Backward, and proto params.
  */
+
+// The main function which does the permute.
 template <typename Dtype>
-class MatrixMultiplicationYtLayer : public Layer<Dtype> {
+void Permute(const int count, Dtype* bottom_data, const bool forward,
+    const int* permute_order, const int* old_steps, const int* new_steps,
+    const int num_axes, Dtype* top_data);
+
+template <typename Dtype>
+class PermuteLayer : public Layer<Dtype> {
  public:
-  explicit MatrixMultiplicationYtLayer(const LayerParameter& param)
+  explicit PermuteLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "MatrixMultiplicationYt"; }
-  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline const char* type() const { return "Permute"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
  protected:
@@ -46,11 +45,15 @@ class MatrixMultiplicationYtLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  int M_; //X <MxK>, Y<NxK>, Z<MxN>
-  int K_;
-  int N_;
+  int num_axes_;
+  bool need_permute_;
+
+  // Use Blob because it is convenient to be accessible in .cu file.
+  Blob<int> permute_order_;
+  Blob<int> old_steps_;
+  Blob<int> new_steps_;
 };
 
 }  // namespace caffe
 
-#endif  // CAFFE_MATRIX_MULTIPLICATION_YT_LAYER_HPP_
+#endif  // CAFFE_PERMUTE_LAYER_HPP_

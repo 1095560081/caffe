@@ -46,8 +46,10 @@ void SoftmaxWithLossLayer<Dtype>::Forward_gpu(
   SoftmaxLossForwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
       CAFFE_CUDA_NUM_THREADS>>>(nthreads, prob_data, label, loss_data,
       outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts);
-  const Dtype* label_weights = label_weights_.gpu_data();
-  caffe_gpu_mul(label_weights_.count(), label_weights, loss_data, loss_data); //perform reweighting
+  if(label_weights_.count()>0) {
+    const Dtype* label_weights = label_weights_.gpu_data();
+    caffe_gpu_mul(label_weights_.count(), label_weights, loss_data, loss_data); //perform reweighting
+  }
   Dtype loss;
   caffe_gpu_asum(nthreads, loss_data, &loss);
   Dtype valid_count = -1;
@@ -114,8 +116,10 @@ void SoftmaxWithLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         CAFFE_CUDA_NUM_THREADS>>>(nthreads, top_data, label, bottom_diff,
         outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts);
 
-    const Dtype* label_weights = label_weights_.gpu_data();
-    caffe_gpu_mul(label_weights_.count(), label_weights, bottom_diff, bottom_diff); //perform reweighting
+    if(label_weights_.count()>0) {
+      const Dtype* label_weights = label_weights_.gpu_data();
+      caffe_gpu_mul(label_weights_.count(), label_weights, bottom_diff, bottom_diff); //perform reweighting
+    }
 
     Dtype valid_count = -1;
     // Only launch another CUDA kernel if we actually need the count of valid

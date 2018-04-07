@@ -25,6 +25,8 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
         blob_bottom_Y_(new Blob<Dtype>()),
         blob_bottom_x_(new Blob<Dtype>()),
         blob_bottom_y_(new Blob<Dtype>()),
+        blob_bottom_Xx_(new Blob<Dtype>()),
+        blob_bottom_Yy_(new Blob<Dtype>()),
         blob_top_(new Blob<Dtype>()) {
     // reshape
     vector<int> shape(3);
@@ -37,6 +39,12 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
     blob_bottom_x_->Reshape(shape2);
     shape2[0]=4; shape2[1]=5;
     blob_bottom_y_->Reshape(shape2);
+
+    vector<int> shape3(4);
+    shape3[0]=2; shape3[1]=3; shape3[2]=4; shape3[3]=5;
+    blob_bottom_Xx_->Reshape(shape3);
+    shape3[0]=2; shape3[1]=3; shape3[2]=5; shape3[3]=6;
+    blob_bottom_Yy_->Reshape(shape3);
     // fill the values
     FillerParameter filler_param;
     UniformFiller<Dtype> filler(filler_param);
@@ -44,6 +52,8 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
     filler.Fill(this->blob_bottom_Y_);
     filler.Fill(this->blob_bottom_x_);
     filler.Fill(this->blob_bottom_y_);
+    filler.Fill(this->blob_bottom_Xx_);
+    filler.Fill(this->blob_bottom_Yy_);
     blob_top_vec_.push_back(blob_top_);
   }
   virtual ~MatrixMultiplicationLayerTest() {
@@ -51,12 +61,16 @@ class MatrixMultiplicationLayerTest : public MultiDeviceTest<TypeParam> {
     delete blob_bottom_Y_;
     delete blob_bottom_x_;
     delete blob_bottom_y_;
+    delete blob_bottom_Xx_;
+    delete blob_bottom_Yy_;
     delete blob_top_;
   }
   Blob<Dtype>* const blob_bottom_X_;
   Blob<Dtype>* const blob_bottom_Y_;
   Blob<Dtype>* const blob_bottom_x_;
   Blob<Dtype>* const blob_bottom_y_;
+  Blob<Dtype>* const blob_bottom_Xx_;
+  Blob<Dtype>* const blob_bottom_Yy_;
   Blob<Dtype>* const blob_top_;
   vector<Blob<Dtype>*> blob_bottom_vec_;
   vector<Blob<Dtype>*> blob_top_vec_;
@@ -108,6 +122,17 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestSetUp) {
   EXPECT_EQ(this->blob_top_->num_axes(), 2);
   EXPECT_EQ(this->blob_top_->shape(0), 3);
   EXPECT_EQ(this->blob_top_->shape(1), 5);
+
+  //Xx Yy
+  this->blob_bottom_vec_.clear();
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Xx_);
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Yy_);
+  layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num_axes(), 4);
+  EXPECT_EQ(this->blob_top_->shape(0), 2);
+  EXPECT_EQ(this->blob_top_->shape(1), 3);
+  EXPECT_EQ(this->blob_top_->shape(2), 4);
+  EXPECT_EQ(this->blob_top_->shape(3), 6);
 }
 
 template <typename Dtype>
@@ -179,6 +204,46 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXY) {
         Y_data+b*Y_stride,
         Z_data+b*Z_stride);
     }
+  } else {
+    LOG(ERROR) << "Skipping test due to old architecture.";
+  }
+}
+
+TYPED_TEST(MatrixMultiplicationLayerTest, TestForwardXxYy) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.clear();
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Xx_);
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Yy_);
+  bool IS_VALID_CUDA = false;
+#ifndef CPU_ONLY
+  IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
+#endif
+  if (Caffe::mode() == Caffe::CPU ||
+      sizeof(Dtype) == 4 || IS_VALID_CUDA) {
+    LayerParameter layer_param;
+    shared_ptr<MatrixMultiplicationLayer<Dtype> > layer(
+        new MatrixMultiplicationLayer<Dtype>(layer_param));
+    layer->SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    layer->Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    const Dtype* X_data = this->blob_bottom_Xx_->cpu_data();
+    const Dtype* Y_data = this->blob_bottom_Yy_->cpu_data();
+    const Dtype* Z_data = this->blob_top_->cpu_data();
+    const int B = this->blob_bottom_Xx_->count(0,2);
+    const int M = this->blob_top_->shape(2);
+    const int N = this->blob_top_->shape(3);
+    const int K = this->blob_bottom_Xx_->shape(3);
+    const int X_stride = this->blob_bottom_Xx_->count(
+        this->blob_bottom_Xx_->CanonicalAxisIndex(-2));//DxBxMxK
+    const int Y_stride = this->blob_bottom_Yy_->count(
+        this->blob_bottom_Yy_->CanonicalAxisIndex(-2)); //DxBxKxN
+    const int Z_stride = this->blob_top_->count(
+        this->blob_top_->CanonicalAxisIndex(-2)); //DxBxMxN
+    for (int b = 0; b < B; ++b) {
+      check_mat_mul<Dtype>(M,N,K,
+        X_data+b*X_stride,
+        Y_data+b*Y_stride,
+        Z_data+b*Z_stride);
+    }//b
   } else {
     LOG(ERROR) << "Skipping test due to old architecture.";
   }
@@ -292,6 +357,27 @@ TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXY) {
   this->blob_bottom_vec_.clear();
   this->blob_bottom_vec_.push_back(this->blob_bottom_X_);
   this->blob_bottom_vec_.push_back(this->blob_bottom_Y_);
+  bool IS_VALID_CUDA = false;
+#ifndef CPU_ONLY
+  IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;
+#endif
+  if (Caffe::mode() == Caffe::CPU ||
+      sizeof(Dtype) == 4 || IS_VALID_CUDA) {
+    LayerParameter layer_param;
+    MatrixMultiplicationLayer<Dtype> layer(layer_param);
+    GradientChecker<Dtype> checker(1e-2, 1e-3);
+    checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+        this->blob_top_vec_);
+  } else {
+    LOG(ERROR) << "Skipping test due to old architecture.";
+  }
+}
+
+TYPED_TEST(MatrixMultiplicationLayerTest, TestGradientXxYy) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.clear();
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Xx_);
+  this->blob_bottom_vec_.push_back(this->blob_bottom_Yy_);
   bool IS_VALID_CUDA = false;
 #ifndef CPU_ONLY
   IS_VALID_CUDA = CAFFE_TEST_CUDA_PROP.major >= 2;

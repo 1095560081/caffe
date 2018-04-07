@@ -1,13 +1,13 @@
 #include <vector>
 
 #include "caffe/filler.hpp"
-#include "caffe/layers/matrix_multiplication_layer.hpp"
+#include "caffe/layers/matrix_multiplication_xt_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
 namespace caffe {
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+void MatrixMultiplicationXtLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
 
   const Dtype* X_data = bottom[0]->gpu_data();
@@ -22,7 +22,7 @@ void MatrixMultiplicationLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& b
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;
   for(int b=0; b<B; ++b) {//TODO: parfor by OpenMP?
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
+    caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
       M_, N_, K_,
       (Dtype)1.,
       X_data+b*X_stride*int(X_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
@@ -32,7 +32,7 @@ void MatrixMultiplicationLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& b
 }
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+void MatrixMultiplicationXtLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
 
@@ -59,17 +59,17 @@ void MatrixMultiplicationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& 
   const int Z_stride = M_ * N_;
   for(int b=0; b<B; ++b) {//TODO: parfor by OpenMP?
     if (propagate_down[0]) {
-      // dl/dX' = dl/d(XY)' * Y', i.e., bottom[0].diff = top[0].diff * bottom[1].data'
+      // dl/dX' = Y * dl/d(X'Y), i.e., bottom[0].diff = bottom[1].data * top[0].diff'
       caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans,
-        M_, K_, N_,
+        K_, M_, N_,
         (Dtype)1.,
-        Z_diff+b*Z_stride*int(Z_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
+        Y_data+b*Y_stride*int(Y_hasbatch), Z_diff+b*Z_stride*int(Z_hasbatch),
         (Dtype)(X_needbroadcast? 1. : 0.),
         X_diff+b*X_stride*int(X_hasbatch));
     }
     if (propagate_down[1]) {
-      // dl/dY' = X' * dl/d(XY)', i.e., bottom[1].diff = bottom[0].data' * top[0].diff
-      caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
+      // dl/dY' = X * dl/d(X'Y)', i.e., bottom[1].diff = bottom[0].data * top[0].diff
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
         K_, N_, M_,
         (Dtype)1.,
         X_data+b*X_stride*int(X_hasbatch), Z_diff+b*Z_stride*int(Z_hasbatch),
@@ -79,6 +79,6 @@ void MatrixMultiplicationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& 
   }//for b
 }
 
-INSTANTIATE_LAYER_GPU_FUNCS(MatrixMultiplicationLayer);
+INSTANTIATE_LAYER_GPU_FUNCS(MatrixMultiplicationXtLayer);
 
 }  // namespace caffe

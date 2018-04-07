@@ -9,10 +9,11 @@ namespace caffe {
 
 template <typename Dtype>
 void SoftmaxWithLossLayer<Dtype>::FillLabelWeights(const vector<Blob<Dtype>*>& bottom) {
+  if(this->layer_param_.loss_param().label_weight_size()==0) return;
   //fill label_weights_vec_
   const int nlabels = bottom[0]->shape(softmax_axis_);
   if(nlabels!=label_weights_vec_.size()) {
-    LOG(INFO) << "Reshape label_weights_vec_ FROM "<<label_weights_vec_.size()<<" TO "<<nlabels;
+    //LOG(INFO) << "Reshape label_weights_vec_ FROM "<<label_weights_vec_.size()<<" TO "<<nlabels;
     label_weights_vec_.resize(nlabels, 1);
     for(int i=0; i<this->layer_param_.loss_param().label_weight_size(); ++i) {
       this->label_weights_vec_[i] = this->layer_param_.loss_param().label_weight(i);
@@ -26,7 +27,7 @@ void SoftmaxWithLossLayer<Dtype>::FillLabelWeights(const vector<Blob<Dtype>*>& b
   if(  label_weights_.count()!=bottom[0]->count()
      ||label_weights_.shape_string() != bottom[0]->shape_string())
   {
-    LOG(INFO) << "Reshape label_weights_ FROM "<<label_weights_.shape_string()<< " TO "<<bottom[0]->shape_string();
+    //LOG(INFO) << "Reshape label_weights_ FROM "<<label_weights_.shape_string()<< " TO "<<bottom[0]->shape_string();
     vector<Dtype> label_weight_tmp(bottom[0]->count(), 1); //by default, all label weights are 1
     int dim = bottom[0]->count() / outer_num_;
     for(int ni=0; ni<outer_num_; ++ni) {
@@ -152,7 +153,9 @@ void SoftmaxWithLossLayer<Dtype>::Forward_cpu(
       DCHECK_GE(label_value, 0);
       DCHECK_LT(label_value, prob_.shape(softmax_axis_));
       loss -= log(std::max(prob_data[i * dim + label_value * inner_num_ + j],
-                           Dtype(FLT_MIN))) * this->label_weights_vec_[label_value];
+                           Dtype(FLT_MIN))) *
+                           (this->label_weights_vec_.size()>0 ?
+                            this->label_weights_vec_[label_value] : (Dtype)1.0);
       ++count;
     }
   }
@@ -191,10 +194,12 @@ void SoftmaxWithLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       }
 
       //perform label-wise balance
-      for(int labeli=0; labeli<nlabels; ++labeli) {
-        const Dtype labeli_weight = this->label_weights_vec_[labeli];
-        if(labeli_weight!=1) {
-          caffe_scal(inner_num_, labeli_weight, bottom_diff+(i*dim + labeli*inner_num_));
+      if(this->label_weights_vec_.size()>0) {
+        for(int labeli=0; labeli<nlabels; ++labeli) {
+          const Dtype labeli_weight = this->label_weights_vec_[labeli];
+          if(labeli_weight!=1) {
+            caffe_scal(inner_num_, labeli_weight, bottom_diff+(i*dim + labeli*inner_num_));
+          }
         }
       }
     }

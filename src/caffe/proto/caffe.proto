@@ -322,7 +322,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 148 (last added: swish_param)
+// LayerParameter next available layer-specific ID: 154 (last added: swish_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -378,6 +378,7 @@ message LayerParameter {
   optional ArgMaxParameter argmax_param = 103;
   optional BatchNormParameter batch_norm_param = 139;
   optional BiasParameter bias_param = 141;
+  optional BSplineBasisParameter bspline_basis_param = 148;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -390,6 +391,7 @@ message LayerParameter {
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
+  optional GraphPoolingParameter graph_pooling_param = 147;
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
@@ -397,8 +399,11 @@ message LayerParameter {
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
   optional InputParameter input_param = 143;
+  optional KernelCorrelationParameter kernel_correlation_param = 149;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
+  optional L2NormalizationParameter l2n_param = 150;
+  optional PermuteParameter permute_param = 152;
   optional MemoryDataParameter memory_data_param = 119;
   optional MVNParameter mvn_param = 120;
   optional ParameterParameter parameter_param = 145;
@@ -415,8 +420,9 @@ message LayerParameter {
   optional SoftmaxParameter softmax_param = 125;
   optional SPPParameter spp_param = 132;
   optional SliceParameter slice_param = 126;
-  optional SwishParameter swish_param = 147;
+  optional SwishParameter swish_param = 153;
   optional TanHParameter tanh_param = 127;
+  optional TensorTransposeParameter tensor_transpose_param = 151;
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
@@ -571,6 +577,16 @@ message BiasParameter {
   // Default is the zero (0) initialization, resulting in the BiasLayer
   // initially performing the identity operation.
   optional FillerParameter filler = 3;
+}
+
+message BSplineBasisParameter {
+  // The degree of the basis function
+  optional uint32 degree = 1 [default = 3];
+
+  // The knot vector defining basis function along each dimension
+  // it is a string in CSV format (comma-seperated)
+  // by default this is not used and knot vectors are input as the second bottom
+  repeated string knot_vector = 2;
 }
 
 message ContrastiveLossParameter {
@@ -771,6 +787,15 @@ message FlattenParameter {
   optional int32 end_axis = 2 [default = -1];
 }
 
+message GraphPoolingParameter {
+  //pooling operation is defined by a graph G, stored as CSC format sparse matrix (indptr, indices, data)
+  enum Mode {
+    AVE   = 1; //Y=GX
+    MAX   = 2; //Y=max_{G}(X)
+  }
+  optional Mode mode = 3 [default = MAX];
+}
+
 // Message that stores parameters used by HDF5DataLayer
 message HDF5DataParameter {
   // Specify the data source.
@@ -861,6 +886,13 @@ message InputParameter {
   repeated BlobShape shape = 1;
 }
 
+message KernelCorrelationParameter {
+  required uint32 num_output = 1;            //number of output channels, i.e., number of kernels
+  required uint32 num_points_per_kernel = 2; //number of points per kernel
+  required float  sigma = 3;				 //kernel bandwidth
+  optional FillerParameter kernel_filler = 4;
+}
+
 // Message that stores parameters used by LogLayer
 message LogParameter {
   // LogLayer computes outputs y = log_base(shift + scale * x), for base > 0.
@@ -890,6 +922,12 @@ message LRNParameter {
   optional Engine engine = 6 [default = DEFAULT];
 }
 
+message L2NormalizationParameter { 
+  optional bool  is_global = 1 [default = true]; //whether to perform global l2 normalization
+  optional int32 axis = 2 [default = 0];         //normalize along which axis if is_global==false
+  optional float eps = 3 [default = 1e-10];		 //eps to be added to norm to avoid divide by zero
+}
+
 message MemoryDataParameter {
   optional uint32 batch_size = 1;
   optional uint32 channels = 2;
@@ -910,6 +948,14 @@ message MVNParameter {
 
 message ParameterParameter {
   optional BlobShape shape = 1;
+  optional FillerParameter filler = 2;
+}
+
+message PermuteParameter {
+  // The new orders of the axes of data. Notice it should be with
+  // in the same range as the input data, and it starts from 0.
+  // Do not provide repeated order.
+  repeated uint32 order = 1;
 }
 
 message PoolingParameter {
@@ -986,6 +1032,7 @@ message ReductionParameter {
     ASUM = 2;
     SUMSQ = 3;
     MEAN = 4;
+    PROD = 5;
   }
 
   optional ReductionOp operation = 1 [default = SUM]; // reduction operation
@@ -1006,6 +1053,9 @@ message ReductionParameter {
   optional int32 axis = 2 [default = 0];
 
   optional float coeff = 3 [default = 1.0]; // coefficient for output
+
+  // only used for PROD mode
+  optional int32 group = 4 [default = -1];
 }
 
 // Message that stores parameters used by ReLULayer
@@ -1176,6 +1226,10 @@ message TanHParameter {
     CUDNN = 2;
   }
   optional Engine engine = 1 [default = DEFAULT];
+}
+
+message TensorTransposeParameter {
+  repeated uint32 order = 1; //order of the transpose blob's axes in the input blob
 }
 
 // Message that stores parameters used by TileLayer

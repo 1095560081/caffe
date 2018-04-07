@@ -249,6 +249,21 @@ void Solver<Dtype>::Step(int iters) {
             net_->blob_names()[net_->output_blob_indices()[j]];
         const Dtype loss_weight =
             net_->blob_loss_weights()[net_->output_blob_indices()[j]];
+        if(output_name.find("NO_OUTPUT")!=std::string::npos) { //suppress loss from none-loss-layer if named with NO_OUTPUT
+          continue;
+        }
+        if(output_name.find("SIMPLE_OUTPUT")!=std::string::npos) { //suppress loss from none-loss-layer if named with SIMPLE_OUTPUT
+          Dtype sum_loss = 0;
+          for (int k = 0; k < result[j]->count(); ++k) {
+            sum_loss += result_vec[k];
+          }
+          sum_loss *= loss_weight;
+          LOG_IF(INFO, Caffe::root_solver()) << "    Train net output #"
+              << score_index++ << ": " << output_name << " = "
+              << " (* " << loss_weight << " = "
+              << sum_loss << " loss)";
+          continue;
+        }
         for (int k = 0; k < result[j]->count(); ++k) {
           ostringstream loss_msg_stream;
           if (loss_weight) {
@@ -408,6 +423,12 @@ void Solver<Dtype>::Test(const int test_net_id) {
     const int output_blob_index =
         test_net->output_blob_indices()[test_score_output_id[i]];
     const string& output_name = test_net->blob_names()[output_blob_index];
+    if(output_name.find("NO_OUTPUT")!=std::string::npos) { //suppress loss from none-loss-layer if named with NO_OUTPUT
+      continue;
+    }
+    if(output_name.find("SIMPLE_OUTPUT")!=std::string::npos) { //suppress loss from none-loss-layer if named with SIMPLE_OUTPUT
+      continue;
+    }
     const Dtype loss_weight = test_net->blob_loss_weights()[output_blob_index];
     ostringstream loss_msg_stream;
     const Dtype mean_score = test_score[i] / param_.test_iter(test_net_id);

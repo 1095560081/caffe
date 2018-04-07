@@ -1,23 +1,24 @@
+
 #include <vector>
 
 #include "caffe/filler.hpp"
-#include "caffe/layers/matrix_multiplication_layer.hpp"
+#include "caffe/layers/matrix_multiplication_xt_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
 namespace caffe {
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+void MatrixMultiplicationXtLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   Reshape(bottom, top);
 }
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
+void MatrixMultiplicationXtLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   const int xaxes = bottom[0]->num_axes();
   CHECK(xaxes>=2)
-    << "X blob must be of shape (B1xB2...xBn,M,K) or (M,K)!";
+    << "X blob must be of shape (B1xB2...xBn,K,M) or (K,M)!";
   const int yaxes = bottom[1]->num_axes();
   CHECK(yaxes>=2)
     << "Y blob must be of shape (B1xB2...xBn,K,N) or (K,N)!";
@@ -30,12 +31,12 @@ void MatrixMultiplicationLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& botto
   const int Cx = bottom[0]->shape(-1);
   const int Ry = bottom[1]->shape(-2);
   const int Cy = bottom[1]->shape(-1);
-  CHECK_EQ(Cx, Ry)
+  CHECK_EQ(Rx, Ry)
     << "Input X and Y have incompatible dimensions ("<<Rx<<"x"<<Cx<<" vs. "<<Ry<<"x"<<Cy<<").";
-  M_ = Rx;
-  K_ = Cx;
+  M_ = Cx;
+  K_ = Rx;
   N_ = Cy;
-  
+
   vector<int> top_shape = bottom[ xaxes>=yaxes?0:1 ]->shape();
   top_shape[top_shape.size()-2]=M_;
   top_shape[top_shape.size()-1]=N_;
@@ -43,7 +44,7 @@ void MatrixMultiplicationLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& botto
 }
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+void MatrixMultiplicationXtLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
 
   const Dtype* X_data = bottom[0]->cpu_data();
@@ -58,7 +59,7 @@ void MatrixMultiplicationLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& b
   const int Y_stride = K_ * N_;
   const int Z_stride = M_ * N_;
   for(int b=0; b<B; ++b) {//TODO: parfor by OpenMP?
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
+    caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
       M_, N_, K_,
       (Dtype)1.,
       X_data+b*X_stride*int(X_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
@@ -68,7 +69,7 @@ void MatrixMultiplicationLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& b
 }
 
 template <typename Dtype>
-void MatrixMultiplicationLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+void MatrixMultiplicationXtLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
 
@@ -95,17 +96,17 @@ void MatrixMultiplicationLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& 
   const int Z_stride = M_ * N_;
   for(int b=0; b<B; ++b) {//TODO: parfor by OpenMP?
     if (propagate_down[0]) {
-      // dl/dX' = dl/d(XY)' * Y', i.e., bottom[0].diff = top[0].diff * bottom[1].data'
+      // dl/dX' = Y * dl/d(X'Y), i.e., bottom[0].diff = bottom[1].data * top[0].diff'
       caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans,
-        M_, K_, N_,
+        K_, M_, N_,
         (Dtype)1.,
-        Z_diff+b*Z_stride*int(Z_hasbatch), Y_data+b*Y_stride*int(Y_hasbatch),
+        Y_data+b*Y_stride*int(Y_hasbatch), Z_diff+b*Z_stride*int(Z_hasbatch),
         (Dtype)(X_needbroadcast? 1. : 0.),
         X_diff+b*X_stride*int(X_hasbatch));
     }
     if (propagate_down[1]) {
-      // dl/dY' = X' * dl/d(XY)', i.e., bottom[1].diff = bottom[0].data' * top[0].diff
-      caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
+      // dl/dY' = X * dl/d(X'Y)', i.e., bottom[1].diff = bottom[0].data * top[0].diff
+      caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
         K_, N_, M_,
         (Dtype)1.,
         X_data+b*X_stride*int(X_hasbatch), Z_diff+b*Z_stride*int(Z_hasbatch),
@@ -116,10 +117,10 @@ void MatrixMultiplicationLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& 
 }
 
 #ifdef CPU_ONLY
-STUB_GPU(MatrixMultiplicationLayer);
+STUB_GPU(MatrixMultiplicationXtLayer);
 #endif
 
-INSTANTIATE_CLASS(MatrixMultiplicationLayer);
-REGISTER_LAYER_CLASS(MatrixMultiplication);
+INSTANTIATE_CLASS(MatrixMultiplicationXtLayer);
+REGISTER_LAYER_CLASS(MatrixMultiplicationXt);
 
 }  // namespace caffe
